@@ -1,0 +1,29 @@
+[project]
+name = "inference-engine"
+version = "0.1.0"
+description = "Learning GPU kernels and LLM inference systems"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.6,<3",
+    "numpy>=1.26,<3",
+    "transformers>=4.45,<5",
+    "safetensors>=0.4",
+    "huggingface-hub>=0.26,<1",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# CPU wheels keep the learning environment small on Linux and Windows.
+# Revisit this source when setting up the NVIDIA environment.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
