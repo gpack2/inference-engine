@@ -11,6 +11,9 @@ dependencies = [
     "huggingface-hub>=0.26,<1",
 ]
 
+[project.scripts]
+tiny-infer = "inference_engine.cli:main"
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
