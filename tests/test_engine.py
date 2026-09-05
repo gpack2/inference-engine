@@ -8,6 +8,8 @@ from torch.nn import functional as F
 
 from inference_engine import ModelConfig, TinyDecoder, generate
 from inference_engine.ops import RMSNorm, apply_rope, attention
+import inference_engine.ops as ops_module
+import inference_engine.model as model_module
 
 
 def config(**overrides):
@@ -152,6 +154,83 @@ class EngineTests(unittest.TestCase):
                           {"num_layers": 0}, {"norm_eps": 0}, {"rope_theta": float("nan")}):
             with self.subTest(overrides=overrides), self.assertRaises(ValueError):
                 config(**overrides)
+
+    def test_last_token_projection_preserves_logits_and_complete_cache(self):
+        for device in available_devices():
+            with self.subTest(device=device):
+                self.model.to(device)
+                tokens = self.tokens.to(device)
+                full_cache, last_cache = [self.model.new_cache(batch_size=2) for _ in range(2)]
+                full = self.model(tokens, full_cache)
+                last = self.model(tokens, last_cache, last_token_only=True)
+                self.assertEqual(tuple(full.shape), (2, 9, 31))
+                self.assertEqual(tuple(last.shape), (2, 1, 31))
+                self.assert_close(last, full[:, -1:])
+                self.assertEqual(last_cache.length, tokens.shape[1])
+                for a, b in ((full_cache.keys, last_cache.keys), (full_cache.values, last_cache.values)):
+                    torch.testing.assert_close(a[:, :, :, :9], b[:, :, :, :9], rtol=0, atol=0)
+                next_token = full[:, -1].argmax(-1, keepdim=True)
+                self.assert_close(self.model(next_token, last_cache, last_token_only=True),
+                                  self.model(next_token, full_cache))
+
+    def test_projection_modes_match_generation_with_and_without_cache(self):
+        for device in available_devices():
+            self.model.to(device)
+            prompt = self.tokens[:1, :4].to(device)
+            for use_cache in (True, False):
+                with self.subTest(device=device, use_cache=use_cache):
+                    full = generate(self.model, prompt, 6, use_cache=use_cache, last_token_only=False)
+                    last = generate(self.model, prompt, 6, use_cache=use_cache, last_token_only=True)
+                    torch.testing.assert_close(last, full, rtol=0, atol=0)
+                    eos = full[0, 4].item()
+                    stopped = generate(self.model, prompt, 6, use_cache=use_cache,
+                                       last_token_only=True, eos_token_id=eos)
+                    torch.testing.assert_close(stopped, full[:, :5], rtol=0, atol=0)
+
+    def test_shared_rope_matches_recomputation_across_chunks_cache_reset_and_devices(self):
+        for device in available_devices():
+            self.model.to(device)
+            tokens = self.tokens.to(device)
+            caches = [self.model.new_cache(batch_size=2) for _ in range(2)]
+            for chunks in ([3, 1, 5], [9]):
+                for cache in caches:
+                    cache.reset()
+                offset = 0
+                for count in chunks:
+                    with self.subTest(device=device, chunks=chunks, offset=offset):
+                        chunk = tokens[:, offset:offset + count]
+                        full = self.model(chunk, caches[0], reuse_rope=False)
+                        shared = self.model(chunk, caches[1], reuse_rope=True)
+                        self.assert_close(shared, full)
+                        offset += count
+                        for field in ("keys", "values"):
+                            self.assert_close(getattr(caches[1], field)[:, :, :, :offset],
+                                              getattr(caches[0], field)[:, :, :, :offset])
+            for use_cache in (True, False):
+                prompt = tokens[:1, :3]
+                expected = generate(self.model, prompt, 5, use_cache=use_cache, reuse_rope=False)
+                actual = generate(self.model, prompt, 5, use_cache=use_cache, reuse_rope=True)
+                torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+                eos = expected[0, 3].item()
+                stopped = generate(self.model, prompt, 5, use_cache=use_cache, eos_token_id=eos, reuse_rope=True)
+                torch.testing.assert_close(stopped, expected[:, :4], rtol=0, atol=0)
+
+    def test_rope_setup_is_shared_across_q_k_and_layers(self):
+        original = ops_module.rope_frequencies
+        with patch.object(ops_module, "rope_frequencies", wraps=original) as repeated:
+            with patch.object(model_module, "rope_frequencies", wraps=original) as shared:
+                self.model(self.tokens, reuse_rope=False)
+                self.assertEqual(repeated.call_count, 2 * self.model.config.num_layers)
+                self.assertEqual(shared.call_count, 0)
+                repeated.reset_mock()
+                self.model(self.tokens, reuse_rope=True)
+                self.assertEqual(repeated.call_count, 0)
+                self.assertEqual(shared.call_count, 1)
+                repeated.reset_mock()
+                shared.reset_mock()
+                self.model(self.tokens)
+                self.assertEqual(repeated.call_count, 2 * self.model.config.num_layers)
+                self.assertEqual(shared.call_count, 0)
 
 
 class OperationTests(unittest.TestCase):

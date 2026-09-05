@@ -24,7 +24,7 @@ PROMPTS = [
 
 
 @torch.inference_mode()
-def captured_forward(model, tokens, *, reference=False):
+def captured_forward(model, tokens, *, reference=False, reuse_rope=False):
     outputs, handles = {}, []
     modules = {"embedding": model.model.embed_tokens if reference else model.embedding}
     layers = model.model.layers if reference else model.layers
@@ -40,7 +40,7 @@ def captured_forward(model, tokens, *, reference=False):
     try:
         for name, module in modules.items():
             handles.append(module.register_forward_hook(capture(name)))
-        result = model(tokens, use_cache=False) if reference else model(tokens)
+        result = model(tokens, use_cache=False) if reference else model(tokens, reuse_rope=reuse_rope)
         return (result.logits if reference else result).cpu(), outputs
     finally:
         for handle in handles:
@@ -63,6 +63,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", choices=("cpu", "mps", "cuda", "auto"), default="auto")
     parser.add_argument("--offline", action="store_true")
+    parser.add_argument("--share-rope", action="store_true", help="Validate experimental shared RoPE setup")
     parser.add_argument("--new-tokens", type=int, default=8)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -86,7 +87,7 @@ def main():
         **source_metadata(),
         "model_id": checkpoint.model_id, "revision": checkpoint.revision,
         "engine_device": str(device), "reference_device": str(device), "drift_reference_device": "cpu",
-        "dtype": "float32", "reference_attention": "eager",
+        "dtype": "float32", "reference_attention": "eager", "reuse_rope": args.share_rope,
         "torch": torch.__version__, "transformers": transformers.__version__,
         "python": platform.python_version(), "platform": platform.platform(),
         "rtol": 2e-4, "atol": 2e-4, "max_new_tokens": args.new_tokens,
@@ -100,7 +101,7 @@ def main():
         tokens = cpu_tokens.to(device)
         cpu_expected, cpu_layers = captured_forward(reference, cpu_tokens, reference=True)
         expected, expected_layers = captured_forward(device_reference, tokens, reference=True)
-        actual, actual_layers = captured_forward(checkpoint.model, tokens)
+        actual, actual_layers = captured_forward(checkpoint.model, tokens, reuse_rope=args.share_rope)
         case = {"prompt": text, "prompt_tokens": tokens.shape[1], "logits": compare(actual, expected),
                 "layers": {name: compare(actual_layers[name], value) for name, value in expected_layers.items()}}
         case["cross_device_drift"] = {
@@ -113,8 +114,8 @@ def main():
         # A multi-token append after prefill exercises absolute-position masking.
         split = max(1, tokens.shape[1] // 2)
         cache = checkpoint.model.new_cache(capacity=tokens.shape[1] + args.new_tokens)
-        prefill = checkpoint.model(tokens[:, :split], cache)
-        suffix = checkpoint.model(tokens[:, split:], cache)
+        prefill = checkpoint.model(tokens[:, :split], cache, reuse_rope=args.share_rope)
+        suffix = checkpoint.model(tokens[:, split:], cache, reuse_rope=args.share_rope)
         ref_prefill = device_reference(tokens[:, :split], use_cache=True)
         ref_suffix = device_reference(tokens[:, split:], past_key_values=ref_prefill.past_key_values, use_cache=True)
         ref_chunked = torch.cat((ref_prefill.logits, ref_suffix.logits), dim=1)
@@ -128,21 +129,21 @@ def main():
             tokens, attention_mask=torch.ones_like(tokens), max_new_tokens=args.new_tokens,
             do_sample=False, eos_token_id=eos, pad_token_id=eos,
         )
-        cached = generate(checkpoint.model, tokens, args.new_tokens, eos_token_id=eos)
-        uncached = generate(checkpoint.model, tokens, args.new_tokens, use_cache=False, eos_token_id=eos)
+        cached = generate(checkpoint.model, tokens, args.new_tokens, eos_token_id=eos, reuse_rope=args.share_rope)
+        uncached = generate(checkpoint.model, tokens, args.new_tokens, use_cache=False, eos_token_id=eos, reuse_rope=args.share_rope)
         torch.testing.assert_close(cached.cpu(), expected_tokens.cpu(), rtol=0, atol=0)
         torch.testing.assert_close(uncached.cpu(), expected_tokens.cpu(), rtol=0, atol=0)
 
         # Compare each decode step's full vocabulary, not just its winning token.
         cache.reset()
-        checkpoint.model(tokens, cache)
+        checkpoint.model(tokens, cache, reuse_rope=args.share_rope)
         ref_cache = device_reference(tokens, use_cache=True).past_key_values
         errors = []
         for position in range(tokens.shape[1], expected_tokens.shape[1]):
             expected_full = device_reference(expected_tokens[:, :position + 1], use_cache=False).logits[:, -1:]
             ref_step = device_reference(expected_tokens[:, position:position + 1], past_key_values=ref_cache, use_cache=True)
             ref_cache = ref_step.past_key_values
-            actual_step = checkpoint.model(expected_tokens[:, position:position + 1].to(device), cache)
+            actual_step = checkpoint.model(expected_tokens[:, position:position + 1].to(device), cache, reuse_rope=args.share_rope)
             errors.append({"cached_reference": compare(actual_step, ref_step.logits),
                            "full_reference": compare(actual_step, expected_full, atol=1e-3),
                            "hf_cached_vs_full": compare(ref_step.logits, expected_full, atol=1e-3)})

@@ -16,6 +16,11 @@ def main():
     parser.add_argument("--max-new-tokens", type=int, default=16)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument("--full-logits", action="store_true", help="Use the original all-position vocabulary projection")
+    rope = parser.add_mutually_exclusive_group()
+    rope.add_argument("--share-rope", dest="reuse_rope", action="store_true", help="Experiment with shared RoPE setup (regressed on tested MPS workloads)")
+    rope.add_argument("--recompute-rope", dest="reuse_rope", action="store_false", help="Use the default per-application RoPE setup")
+    parser.set_defaults(reuse_rope=False)
     parser.add_argument("--model", choices=("tiny", "qwen"), default="tiny")
     parser.add_argument("--context-length", type=int, default=512, help="Context cap for Qwen")
     parser.add_argument("--offline", action="store_true", help="Use only previously cached checkpoint files")
@@ -37,11 +42,13 @@ def main():
             ids = list(args.prompt.encode("utf-8"))
         prompt = torch.tensor([ids], dtype=torch.long, device=device)
         result = generate(model, prompt, args.max_new_tokens, use_cache=not args.no_cache,
-                          eos_token_id=tokenizer.eos_token_id if tokenizer else None)
+                          eos_token_id=tokenizer.eos_token_id if tokenizer else None,
+                          last_token_only=not args.full_logits, reuse_rope=args.reuse_rope)
     except ValueError as error:
         parser.error(str(error))
     generated = result[0, prompt.shape[1]:].cpu().tolist()
-    print(f"Model={args.model} | device={device} | cache={not args.no_cache}")
+    print(f"Model={args.model} | device={device} | cache={not args.no_cache} | last-token logits={not args.full_logits}")
+    print(f"Shared RoPE frequencies: {args.reuse_rope}")
     print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}")
     print(f"Prompt: {args.prompt!r}")
     print(f"Generated token IDs: {generated}")

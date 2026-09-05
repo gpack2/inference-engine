@@ -12,7 +12,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .cache import KVCache
-from .ops import RMSNorm, apply_rope, attention
+from .ops import RMSNorm, apply_rope, attention, rope_frequencies
 
 
 @dataclass(frozen=True)
@@ -64,15 +64,15 @@ class DecoderBlock(nn.Module):
         self.up_proj = nn.Linear(width, config.intermediate_size, bias=False)
         self.down_proj = nn.Linear(config.intermediate_size, width, bias=False)
 
-    def forward(self, x, positions, cache, layer):
+    def forward(self, x, positions, cache, layer, frequencies=None):
         batch, tokens, _ = x.shape
         cfg = self.config
         normalized = self.attention_norm(x)
         q = self.q_proj(normalized).view(batch, tokens, cfg.num_heads, cfg.head_dim).transpose(1, 2)
         k = self.k_proj(normalized).view(batch, tokens, cfg.num_kv_heads, cfg.head_dim).transpose(1, 2)
         v = self.v_proj(normalized).view(batch, tokens, cfg.num_kv_heads, cfg.head_dim).transpose(1, 2)
-        q = apply_rope(q, positions, cfg.rope_theta)
-        k = apply_rope(k, positions, cfg.rope_theta)
+        q = apply_rope(q, positions, cfg.rope_theta, frequencies)
+        k = apply_rope(k, positions, cfg.rope_theta, frequencies)
         start = 0 if cache is None else cache.length
         if cache is not None:
             k, v = cache.write(layer, k, v)
@@ -129,13 +129,18 @@ class TinyDecoder(nn.Module):
             raise ValueError("token id is outside the vocabulary")
 
     @torch.inference_mode()
-    def forward(self, token_ids: torch.Tensor, cache: KVCache | None = None) -> torch.Tensor:
+    def forward(self, token_ids: torch.Tensor, cache: KVCache | None = None,
+                *, last_token_only: bool = False, reuse_rope: bool = False) -> torch.Tensor:
         """Return [batch, tokens, vocab] logits; optionally append to cache.
 
         All requests in a batch share one sequence length. No padding or ragged
         batching yet. Only new tokens should be passed when reusing a cache.
         Cache offsets advance after every layer and the output projection succeed.
         Reset/discard the cache if model weights change; it is not thread-safe.
+        last_token_only projects just the final position to vocabulary logits,
+        returning [batch, 1, vocab]. All input positions still update the cache.
+        reuse_rope=True shares per-forward cos/sin across Q/K and every layer.
+        This is opt-in: measured MPS regressions keep recomputation the default.
         """
         self.validate_tokens(token_ids)
         start = 0
@@ -154,9 +159,21 @@ class TinyDecoder(nn.Module):
             raise ValueError("model context limit exceeded")
         positions = torch.arange(start, end, device=self.device)
         x = self.embedding(token_ids)
+        # Every layer uses the same positions, head dimension and RoPE theta.
+        # Share only this call's frequencies: no persistent buffer or stale
+        # device/position state, and checkpoint loading remains unchanged.
+        frequencies = (rope_frequencies(positions, self.config.head_dim,
+                                       self.config.rope_theta, x.dtype)
+                       if reuse_rope else None)
         for index, layer in enumerate(self.layers):
-            x = layer(x, positions, cache, index)
-        logits = self.lm_head(self.norm(x))
+            x = layer(x, positions, cache, index, frequencies)
+        normalized = self.norm(x)
+        # Generation consumes only the final position's logits. Slice after all
+        # decoder/cache work, before the expensive hidden-to-vocabulary matmul.
+        # Keep normalization unchanged to isolate the projection optimization.
+        if last_token_only:
+            normalized = normalized[:, -1:, :]
+        logits = self.lm_head(normalized)
         if cache is not None:
             cache.length = end
         return logits

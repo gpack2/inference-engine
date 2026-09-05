@@ -22,6 +22,11 @@ def main():
     parser.add_argument("--model", choices=("tiny", "qwen"), default="tiny")
     parser.add_argument("--prompt", help="Text prompt; otherwise use seeded random token IDs")
     parser.add_argument("--offline", action="store_true")
+    parser.add_argument("--full-logits", action="store_true", help="Use the original all-position projection")
+    rope = parser.add_mutually_exclusive_group()
+    rope.add_argument("--share-rope", dest="reuse_rope", action="store_true", help="Opt into shared RoPE setup")
+    rope.add_argument("--recompute-rope", dest="reuse_rope", action="store_false", help="Use default per-application RoPE setup")
+    parser.set_defaults(reuse_rope=False)
     parser.add_argument("--prompt-length", type=int, default=32)
     parser.add_argument("--new-tokens", type=int, default=16)
     parser.add_argument("--repeats", type=int, default=5)
@@ -54,19 +59,20 @@ def main():
         prompt = torch.randint(0, cfg.vocab_size, (1, args.prompt_length)).to(device)
     if prompt.shape[1] + args.new_tokens > cfg.max_seq_len:
         parser.error("Requested sequence exceeds context capacity")
-    cached = generate(model, prompt, args.new_tokens)
-    uncached = generate(model, prompt, args.new_tokens, use_cache=False)
+    projection = {"last_token_only": not args.full_logits, "reuse_rope": args.reuse_rope}
+    cached = generate(model, prompt, args.new_tokens, **projection)
+    uncached = generate(model, prompt, args.new_tokens, use_cache=False, **projection)
     torch.testing.assert_close(cached, uncached, rtol=0, atol=0)
     for _ in range(args.warmup):
         for use_cache in (True, False):
-            generate(model, prompt, args.new_tokens, use_cache=use_cache)
+            generate(model, prompt, args.new_tokens, use_cache=use_cache, **projection)
     samples = {"cached": [], "uncached": []}
     for repeat in range(args.repeats):
         # Alternate order to reduce consistent first/second-run bias.
         for use_cache in ((True, False) if repeat % 2 == 0 else (False, True)):
             synchronize(device)
             start = time.perf_counter()
-            generate(model, prompt, args.new_tokens, use_cache=use_cache)
+            generate(model, prompt, args.new_tokens, use_cache=use_cache, **projection)
             synchronize(device)
             samples["cached" if use_cache else "uncached"].append(time.perf_counter() - start)
     report = {
@@ -74,6 +80,8 @@ def main():
         "kind": "generation_smoke_benchmark", "model": args.model,
         "model_id": checkpoint.model_id if checkpoint else None,
         "model_revision": checkpoint.revision if checkpoint else None,
+        "last_token_only": not args.full_logits,
+        "reuse_rope": args.reuse_rope,
         "prompt_text": args.prompt,
         "device": str(device), "platform": platform.platform(), "torch": torch.__version__,
         "python": platform.python_version(), "dtype": "float32", "seed": 0, "cpu_threads": 1,

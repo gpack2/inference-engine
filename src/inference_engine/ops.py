@@ -16,15 +16,22 @@ class RMSNorm(nn.Module):
         return x * torch.rsqrt(x.square().mean(dim=-1, keepdim=True) + self.eps) * self.weight
 
 
-def apply_rope(x: torch.Tensor, positions: torch.Tensor, theta: float) -> torch.Tensor:
+def rope_frequencies(positions: torch.Tensor, dim: int, theta: float,
+                     dtype: torch.dtype) -> tuple[torch.Tensor, torch.Tensor]:
+    """Build broadcastable cos/sin values once for a shared position range."""
+    inverse_frequency = theta ** (-torch.arange(0, dim, 2, device=positions.device, dtype=dtype) / dim)
+    angles = positions.to(dtype)[:, None] * inverse_frequency[None, :]
+    return angles.cos()[None, None], angles.sin()[None, None]
+
+
+def apply_rope(x: torch.Tensor, positions: torch.Tensor, theta: float,
+               frequencies: tuple[torch.Tensor, torch.Tensor] | None = None) -> torch.Tensor:
     """Rotate paired features (split-half convention) at absolute positions.
 
     x: [batch, heads, tokens, even head dimension]; positions: [tokens].
     """
-    dim = x.shape[-1]
-    inverse_frequency = theta ** (-torch.arange(0, dim, 2, device=x.device, dtype=x.dtype) / dim)
-    angles = positions.to(x.dtype)[:, None] * inverse_frequency[None, :]
-    cosine, sine = angles.cos()[None, None], angles.sin()[None, None]
+    cosine, sine = (rope_frequencies(positions, x.shape[-1], theta, x.dtype)
+                    if frequencies is None else frequencies)
     first, second = x.chunk(2, dim=-1)
     return torch.cat((first * cosine - second * sine, second * cosine + first * sine), dim=-1)
 
