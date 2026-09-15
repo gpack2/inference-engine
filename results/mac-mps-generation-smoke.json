@@ -1,0 +1,89 @@
+{
+  "timestamp_utc": "2026-09-14T21:06:22.852273+00:00",
+  "kind": "tiny_random_model_generation_smoke_benchmark",
+  "device": "mps",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "torch": "2.14.0",
+  "python": "3.12.14",
+  "dtype": "float32",
+  "seed": 0,
+  "cpu_threads": 1,
+  "commit": "c4dba44d564df853b6792a35f40b89e3f6d2159d",
+  "working_tree_dirty": true,
+  "config": {
+    "vocab_size": 256,
+    "hidden_size": 128,
+    "intermediate_size": 256,
+    "num_layers": 2,
+    "num_heads": 4,
+    "num_kv_heads": 2,
+    "max_seq_len": 256,
+    "rope_theta": 10000.0,
+    "norm_eps": 1e-06
+  },
+  "prompt_ids": [
+    102,
+    38,
+    153,
+    222,
+    227,
+    219,
+    52,
+    106,
+    54,
+    42,
+    167,
+    196,
+    183,
+    133,
+    184,
+    30,
+    55,
+    155,
+    173,
+    180,
+    111,
+    25,
+    41,
+    20,
+    159,
+    191,
+    7,
+    132,
+    168,
+    17,
+    237,
+    55
+  ],
+  "new_tokens": 16,
+  "warmup_runs_per_mode": 2,
+  "repeats": 5,
+  "cached_uncached_token_agreement": true,
+  "cache_allocated_bytes": 49152,
+  "scope": "Full generation wall time: includes prefill, decode, Python validation, cache allocation, and token selection; excludes model initialization and prompt transfer. No EOS stopping.",
+  "limitations": "Tiny untrained model, single request, short runs. Not serving throughput or a prediction of NVIDIA performance. Cache may be slower at small shapes.",
+  "results": {
+    "cached": {
+      "seconds": [
+        0.09906508302083239,
+        0.1193273329990916,
+        0.11008445802144706,
+        0.11647629202343524,
+        0.10882358299568295
+      ],
+      "median_seconds": 0.11008445802144706,
+      "output_tokens_per_second_at_median": 145.34295110834648
+    },
+    "uncached": {
+      "seconds": [
+        0.10538612498203292,
+        0.12736858299467713,
+        0.13549416698515415,
+        0.13237658300204203,
+        0.12924254196695983
+      ],
+      "median_seconds": 0.12924254196695983,
+      "output_tokens_per_second_at_median": 123.79824596834621
+    }
+  }
+}

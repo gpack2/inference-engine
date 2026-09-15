@@ -1,0 +1,3 @@
+# Keep generated evidence available without overwhelming source-code reviews.
+docs/assets/*.svg linguist-generated=true -whitespace
+results/*.json linguist-generated=true

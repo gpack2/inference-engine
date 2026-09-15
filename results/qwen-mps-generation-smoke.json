@@ -1,0 +1,87 @@
+{
+  "timestamp_utc": "2026-09-14T21:19:54.056673+00:00",
+  "kind": "generation_smoke_benchmark",
+  "model": "qwen",
+  "model_id": "Qwen/Qwen2.5-0.5B",
+  "model_revision": "060db6499f32faf8b98477b0a26969ef7d8b9987",
+  "prompt_text": "Explain how a GPU executes a matrix multiplication.",
+  "device": "mps",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "torch": "2.14.0",
+  "python": "3.12.14",
+  "dtype": "float32",
+  "seed": 0,
+  "cpu_threads": 1,
+  "commit": "c4dba44d564df853b6792a35f40b89e3f6d2159d",
+  "working_tree_dirty": true,
+  "source_sha256": {
+    "benchmarks/generation.py": "1c29ca7dd707d1085be6e59dfe424d1ed1e80e4260aee98bb6e354ba66ff3ba1",
+    "benchmarks/metadata.py": "4cb7fa9e78fb4d1d2e9d47227c97ad1ea6c19a71564d6f04646a0eb448ecae32",
+    "benchmarks/verify_pretrained.py": "b4d5fc19a7cf7ff5e1748ca579e8cba47a9278e1bced1168188afaebdc59b714",
+    "pyproject.toml": "b39c15b8887a485d0cb8700a369c78bc37f73eecd1a83ea9edb5ee59243f1591",
+    "src/inference_engine/__init__.py": "c56a94e6a0ddda6c70b5c4694500bdd112270ef53fc53a78f56869660c2da3ff",
+    "src/inference_engine/cache.py": "a13ac247a348e222b982b71fa48bec1a9a899a12a7c248be4e504a3362ff1f1a",
+    "src/inference_engine/cli.py": "a7b1c9ea550642c09141191ab9a29a7ed880daac4c4bfa68530c666ffe3361ee",
+    "src/inference_engine/device.py": "bef65db60863bbe77e54144c2a1b31d1c735dbcfdc30bdd1c38aac9be605b72c",
+    "src/inference_engine/generation.py": "690fb9712d6807149a35eeaf0f22e801a3c381d2bcf4db660843eb16f3cf6b9b",
+    "src/inference_engine/model.py": "5ccdb88a1389e56b59aa6dc208e49bd4ddf7f3b127a161005c6733228219ac81",
+    "src/inference_engine/ops.py": "62430516b614f47478af8d45ab1562b2e75cbe0635fd609c32da21b74f03e210",
+    "src/inference_engine/pretrained.py": "5a4034b1000f762803d5e9a0b073179cf2ceeef48e3aca0cdf3b87376d5bdf51",
+    "uv.lock": "c10d591335c3cc8c6db6da09320be8fb5590a5d64e4f8b5b6c470ec2d5356a8a"
+  },
+  "config": {
+    "vocab_size": 151936,
+    "hidden_size": 896,
+    "intermediate_size": 4864,
+    "num_layers": 24,
+    "num_heads": 14,
+    "num_kv_heads": 2,
+    "max_seq_len": 512,
+    "rope_theta": 1000000.0,
+    "norm_eps": 1e-06,
+    "tie_word_embeddings": true
+  },
+  "prompt_ids": [
+    840,
+    20772,
+    1246,
+    264,
+    22670,
+    51435,
+    264,
+    6172,
+    46444,
+    13
+  ],
+  "new_tokens": 16,
+  "warmup_runs_per_mode": 2,
+  "repeats": 5,
+  "cached_uncached_token_agreement": true,
+  "cache_allocated_bytes": 638976,
+  "scope": "Full generation wall time: includes prefill, decode, Python validation, cache allocation, and token selection; excludes model initialization and prompt transfer. No EOS stopping.",
+  "limitations": "Single request, short runs. Not serving throughput or a prediction of NVIDIA performance. The tiny model is untrained; Qwen uses the pinned checkpoint. Cache may be slower at small shapes.",
+  "results": {
+    "cached": {
+      "seconds": [
+        0.4461045829812065,
+        0.4445747089921497,
+        0.4229018340120092,
+        0.42941774998325855,
+        0.4174454170279205
+      ],
+      "median_seconds": 0.42941774998325855,
+      "output_tokens_per_second_at_median": 37.25975463432469
+    },
+    "uncached": {
+      "seconds": [
+        0.6685359579860233,
+        0.6507882919977419,
+        0.6491450419998728,
+        0.6479691659915261,
+        0.648463332967367
+      ],
+      "median_seconds": 0.6491450419998728,
+      "output_tokens_per_second_at_median": 24.647804365427373
+    }
+  }
+}
