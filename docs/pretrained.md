@@ -21,7 +21,7 @@ The mapping includes Q/K/V biases, both normalization weights per layer, all att
 
 **Validation**
 
-Fast tests use tiny random Hugging Face configurations and do not download any models:
+The 25 fast tests include tiny random Hugging Face configurations and do not download any models:
 
 ```bash
 uv run python -m unittest discover -s tests -v
@@ -30,11 +30,11 @@ uv run python -m unittest discover -s tests -v
 Full-checkpoint checks are explicit, separate runs:
 
 ```bash
-uv run python benchmarks/verify_pretrained.py --device cpu --offline --output results/qwen-cpu-verification.json
-uv run python benchmarks/verify_pretrained.py --device mps --offline --output results/qwen-mps-verification.json
+uv run python benchmarks/verify_pretrained.py --share-rope --device cpu --offline --output results/rope-cpu-verification.json
+uv run python benchmarks/verify_pretrained.py --share-rope --device mps --offline --output results/rope-mps-verification.json
 ```
 
-The [CPU report](../results/qwen-cpu-verification.json) and [MPS report](../results/qwen-mps-verification.json) cover three short prose/code prompts. They compare the embedding output, every decoder layer, the final normalization, all prefill logits, chunked prefill, and each cached decode step's full vocabulary. Cached and uncached greedy generation must both exactly match Transformers' greedy token IDs. The reference uses float32 and eager attention. This validates these cases; it is not a language-quality evaluation or evidence of correctness for every context length.
+With last-token projection and experimental shared RoPE enabled, the [CPU report](../results/rope-cpu-verification.json) and [MPS report](../results/rope-mps-verification.json) cover three short prose/code prompts. They compare the embedding output, every decoder layer, the final normalization, all prefill logits, chunked prefill, and each cached decode step's full vocabulary. Cached and uncached greedy generation must both exactly match Transformers' greedy token IDs. The reference uses float32 and eager attention. This validates these cases; it is not a language-quality evaluation or evidence of correctness for every context length.
 
 Same-device, same-shape comparisons use `rtol=2e-4, atol=2e-4`. The reports record maximum and mean absolute errors. CPU/MPS arithmetic drift is recorded separately for both our model and the Hugging Face implementation rather than treating it as a weight-mapping error.
 
@@ -43,9 +43,9 @@ Full versus chunked prefill changes matrix shapes. In a diagnostic MPS run, Hugg
 **Initial performance measurement**
 
 ```bash
-uv run python benchmarks/generation.py --model qwen --device mps --offline --prompt "Explain how a GPU executes a matrix multiplication." --new-tokens 16 --output results/qwen-mps-generation-smoke.json
+uv run python benchmarks/generation.py --model qwen --device mps --offline --prompt "Explain how a GPU executes a matrix multiplication." --new-tokens 16 --full-logits --recompute-rope --output results/qwen-mps-generation-smoke.json
 ```
 
-The [saved run](../results/qwen-mps-generation-smoke.json) measures complete single-request generation, including Python orchestration, prefill, decode, cache allocation, and token selection. Model loading and prompt transfer are excluded. It records five samples per path after two warmups, alternates cached/uncached order, and synchronizes at timing boundaries. Output length is fixed and EOS stopping is disabled for this benchmark. These are preliminary timings; separate time-to-first-token, inter-token latency, load sweeps, and profiler traces are still ahead.
+The [saved run](../results/qwen-mps-generation-smoke.json) measures complete single-request generation, including Python orchestration, prefill, decode, cache allocation, and token selection. Model loading and prompt transfer are excluded. It records five samples per path after two warmups, alternates cached/uncached order, and synchronizes at timing boundaries. Output length is fixed and EOS stopping is disabled for this benchmark. This saved run predates the last-token projection optimization; `--full-logits --recompute-rope` reproduces its original projection mode. The [projection case study](performance-measurement.md) adds a CPU/MPS matrix and separate diagnostic prefill/decode timings. The [decode case study](decode-performance.md) adds a context sweep, synchronized component diagnostics and CPU operator profiles. Client-visible time-to-first-token, inter-token latency, load sweeps and GPU kernel traces remain ahead.
 
 Reports identify the model revision, dependency versions, local commit/dirty state, and source hashes. Weight files stay in the Hugging Face cache. NVIDIA execution and performance remain untested; the CUDA environment must be configured and validated when hardware is available.

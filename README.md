@@ -1,46 +1,77 @@
-# GPU-Optimized LLM Inference Engine
+# LLM Inference Engine
 
-A learning project connecting custom GPU kernels, autoregressive inference, and system-level performance analysis.
+A Qwen2.5-0.5B inference runtime with a custom decoder, contiguous KV cache, and CPU/MPS performance experiments.
 
-Build a small, correct inference engine for one decoder-only transformer on one GPU. Optimize selected operations, integrate them into generation, and explain the measured effects on latency, throughput, and memory use.
+I’m building this to study where inference time goes: model operations, memory management, and the generation loop. The runtime implements the forward pass and greedy decoding in PyTorch. The pretrained model is [Qwen2.5-0.5B](https://huggingface.co/Qwen/Qwen2.5-0.5B); Hugging Face tools supply checkpoint access, tokenization, and the Transformers reference implementation used for validation.
 
-**Status:** the engine runs pretrained Qwen2.5-0.5B on CPU and Apple MPS, using its own decoder, contiguous KV cache, and greedy generation loop. A tiny random-weight model remains available for fast offline experiments. Continuous batching and CUDA/Triton kernels are still ahead. CUDA is selectable but untested on hardware.
+**Working today:** float32 inference on CPU and Apple MPS, cached decoding, last-token vocabulary projection, and reproducible benchmarks. **Next:** request scheduling and batching, followed by CUDA/Triton kernels. CUDA hardware has not yet been validated.
 
-Run from the repository root:
+[Engineering overview](docs/portfolio.md) · [Code walkthrough](docs/engine-walkthrough.md) · [Performance experiments](results/README.md)
+
+## Architecture
+
+```text
+Text → Tokenizer → Prefill → Greedy token selection → Decode → …
+                     │                                ↕
+                     └──────── Per-layer KV cache ────┘
+```
+
+The decoder includes RMSNorm, split-half RoPE, grouped-query attention, and SwiGLU. Each layer writes keys and values into preallocated storage; subsequent decode calls process one new token against the valid cached prefix. Cache ownership, capacity, and position checks are explicit.
+
+Generation projects only the final hidden-state position into vocabulary logits. Ordinary model forwards retain the full-logits interface. The Python API supports equal-length batches for forward passes; generation currently handles one request at a time.
+
+## Measured results
+
+These are comparisons within this engine, using Qwen2.5-0.5B in float32. Each primary case uses five timed runs after two warmups; the linked reports retain raw samples and measurement boundaries.
+
+| Experiment | Workload and device | Result |
+| --- | --- | --- |
+| KV caching vs. full-prefix recomputation | 10 input / 16 output tokens, Apple MPS | **33.8% lower median request latency:** 649.1 → 429.4 ms |
+| Last-token vocabulary projection | 256 input / 16 output tokens, Apple M5 CPU, one thread | **6.1% lower median request latency:** 688.6 → 646.6 ms |
+| Shared RoPE setup | 16–448 initial context tokens, 32 decode steps, Apple M5 CPU/MPS | Small CPU gains in some cases; **5.8–25.3% slower MPS decoding**. Kept opt-in. |
+
+Last-token projection also reduces the returned 256-token prefill logits tensor from **148.4 MiB to 0.58 MiB**. That is one tensor’s storage, not peak memory saved.
+
+![KV caching comparison with individual measurements](docs/assets/kv-cache-baseline.png)
+
+The RoPE experiment is a useful counterexample: reducing repeated setup from 48 times to once per forward did not reliably improve execution. Separate host profiles and synchronized component diagnostics help explain the limits of the measurements; the device-level cause of the MPS regression remains open.
+
+Read the [projection study](docs/performance-measurement.md) and [decode profiling study](docs/decode-performance.md) for methods, correctness checks, results across all shapes, and limitations. These experiments do not claim production serving throughput or NVIDIA performance.
+
+## Run locally
+
+From a checkout of this repository, with [uv](https://docs.astral.sh/uv/) installed:
 
 ```bash
-uv sync --python 3.12
-uv run tiny-infer --model qwen --prompt "The capital of France is" --device mps --max-new-tokens 16
+uv sync --frozen --python 3.12
+
+# Pretrained completion through this engine
+uv run tiny-infer --model qwen --device cpu \
+  --prompt "The capital of France is" --max-new-tokens 16
+
+# Tests use tiny local models; no checkpoint download is needed
 uv run python -m unittest discover -s tests -v
 ```
 
-The first Qwen run downloads approximately 1 GB into the Hugging Face cache outside the repository. Add `--offline` after downloading. Use `--model tiny` for the untrained 361,600-parameter byte-vocabulary demo. Use `--device cpu` for CPU or omit the flag for automatic device selection. Add `--no-cache` to recompute the full prefix at every generation step.
+The first Qwen run downloads approximately 1 GB into the Hugging Face cache. Add `--offline` on later runs. On a supported Mac, use `--device mps` for the Apple GPU. For a quick mechanics-only demo without downloading weights, use `--model tiny`; its random weights do not produce meaningful language.
 
-The model includes RMSNorm, RoPE, grouped-query attention, and SwiGLU. The forward pass supports equal-length batches; generation currently accepts one request. All computation is float32. The [engine walkthrough](docs/engine-walkthrough.md) explains the code; the [pretrained-model guide](docs/pretrained.md) covers weight mapping, validation, and numerical tolerances.
+Useful comparison flags:
 
-Run the initial generation benchmark:
+- `--no-cache`: recompute the full prefix at every step.
+- `--full-logits`: project every input position into the vocabulary.
+- `--share-rope`: opt into experimental shared RoPE setup; disabled by default because of measured regressions.
 
-```bash
-uv run python benchmarks/generation.py --model qwen --device mps --offline --prompt "Explain GPU memory access:" --output results/local-generation.json
-```
+## Validation and layout
 
-It checks cached/uncached token agreement, warms up both paths, synchronizes timing boundaries, and records raw samples and environment metadata. A [pretrained Mac smoke result](results/qwen-mps-generation-smoke.json) is included. These short single-request runs are not serving or NVIDIA performance claims. The original [tiny-model result](results/mac-mps-generation-smoke.json) is retained as an earlier development baseline.
+**25 tests** cover operation references, checkpoint mapping, causal masking, chunked prefill, cache ownership/reuse/overflow, generation, and benchmark accounting. Separate full-checkpoint checks compare layer outputs, logits, and greedy tokens against Hugging Face Transformers on CPU and MPS. Tolerances and fixture scope are documented in the [validation guide](docs/pretrained.md).
 
-Designed for 6–12 hours per week, with Python/PyTorch orchestration and future CUDA C++ and Triton kernels. NVIDIA GPU access is pending; prefer available CMU hardware, with approximately $50 total cloud spending as a fallback.
+| Path | Contents |
+| --- | --- |
+| [`src/inference_engine/`](src/inference_engine/) | Decoder, tensor operations, KV cache, generation, checkpoint loader, CLI |
+| [`tests/`](tests/) | Numerical and runtime invariants |
+| [`benchmarks/`](benchmarks/) | Reference validation, request timing, projection comparisons, decode profiling |
+| [`results/`](results/) | Raw measurements, model revision, environment and source hashes |
+| [`docs/`](docs/) | Design explanations and performance case studies |
+| [`learning/`](learning/) | Small tensor and attention exercises |
 
-Start with the [Mac-first learning track](learning/README.md): a tensor walkthrough and implemented causal attention with CPU/MPS correctness checks.
-
-The proposed progression is:
-
-1. Learn the required PyTorch and transformer fundamentals; establish a reference model and reproducible performance baseline.
-2. Build prefill, cached decoding, and a generation loop on Mac using PyTorch.
-3. Establish an NVIDIA baseline, then implement and profile CUDA/Triton kernels.
-4. Integrate custom kernels and measure their end-to-end impact.
-5. Add batching and study latency, throughput, and memory tradeoffs.
-6. Publish reproducible experiments and a technical report.
-
-The first complete version should generate text correctly, use at least two custom kernels, and include an evidence-based performance analysis. Continuous batching, paged KV storage, and advanced optimizations follow that checkpoint.
-
-The portfolio target adds continuous batching and three reproducible case studies covering kernels, decoding, and request scheduling. Budget approximately 120–180 focused hours for that target; an advanced attention or memory-management extension is additional scope.
-
-See [the initial project plan](docs/project-plan.md) for scope, milestones, architecture, and the benchmark methodology.
+The [roadmap](docs/project-plan.md) tracks remaining work. The engine currently uses library matrix multiplication and explicit attention scores; it has no custom GPU kernels, continuous batching, or HTTP serving layer.
