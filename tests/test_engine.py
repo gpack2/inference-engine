@@ -8,6 +8,7 @@ from torch.nn import functional as F
 
 from inference_engine import ModelConfig, TinyDecoder, generate
 from inference_engine.ops import RMSNorm, apply_rope, attention
+from inference_engine.device import available_devices
 import inference_engine.ops as ops_module
 import inference_engine.model as model_module
 
@@ -16,15 +17,6 @@ def config(**overrides):
     values = dict(vocab_size=31, hidden_size=32, intermediate_size=48,
                   num_layers=2, num_heads=4, num_kv_heads=2, max_seq_len=24)
     return ModelConfig(**(values | overrides))
-
-
-def available_devices():
-    devices = ["cpu"]
-    if torch.backends.mps.is_available():
-        devices.append("mps")
-    if torch.cuda.is_available():
-        devices.append("cuda")
-    return devices
 
 
 class EngineTests(unittest.TestCase):

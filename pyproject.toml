@@ -14,6 +14,10 @@ dependencies = [
 [project.scripts]
 tiny-infer = "inference_engine.cli:main"
 
+[project.optional-dependencies]
+cpu = ["torch==2.14.0"]
+cuda124 = ["torch==2.6.0; sys_platform == 'linux' or sys_platform == 'win32'"]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
@@ -21,12 +25,23 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# CPU wheels keep the learning environment small on Linux and Windows.
-# Revisit this source when setting up the NVIDIA environment.
+[tool.uv]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda124" }]]
+
+# Explicit accelerator extras prevent a CUDA install from resolving to CPU wheels.
+# macOS uses its normal PyPI build (including MPS).
 [tool.uv.sources]
-torch = [{ index = "pytorch-cpu", marker = "sys_platform != 'darwin'" }]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cu124", extra = "cuda124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
 explicit = true

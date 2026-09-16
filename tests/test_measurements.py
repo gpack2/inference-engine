@@ -11,6 +11,7 @@ from projection import phase_trial, run_case
 from decode import decode_trial
 from decode import run_case as decode_case
 from inference_engine import ModelConfig, TinyDecoder, generate
+from inference_engine.device import available_devices
 
 
 class MeasurementTests(unittest.TestCase):
@@ -22,8 +23,7 @@ class MeasurementTests(unittest.TestCase):
         self.prompt = torch.tensor([[1, 2, 3]])
 
     def test_diagnostic_outputs_phase_counts_and_tensor_bytes(self):
-        devices = ["cpu"] + (["mps"] if torch.backends.mps.is_available() else [])
-        for device in devices:
+        for device in available_devices():
             self.model.to(device)
             prompt = self.prompt.to(device)
             for count in (2, 4):
@@ -49,8 +49,7 @@ class MeasurementTests(unittest.TestCase):
             self.assertEqual(len(variant["diagnostic_runs"][0]["decode_step_ms"]), 2)
 
     def test_decode_profile_preserves_tokens_and_accounts_for_cache(self):
-        devices = ["cpu"] + (["mps"] if torch.backends.mps.is_available() else [])
-        for device in devices:
+        for device in available_devices():
             self.model.to(device)
             prompt = self.prompt.to(device)
             expected = generate(self.model, prompt, 4)

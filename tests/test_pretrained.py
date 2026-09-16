@@ -6,6 +6,7 @@ import torch
 from transformers import Qwen2Config, Qwen2ForCausalLM
 
 from inference_engine import generate
+from inference_engine.device import available_devices
 from inference_engine.pretrained import config_from_qwen, import_qwen_weights
 
 
@@ -25,8 +26,7 @@ class PretrainedTests(unittest.TestCase):
         tokens = torch.tensor([[1, 7, 12, 2, 9, 6, 22], [3, 8, 11, 5, 7, 1, 13]])
         with torch.inference_mode():
             expected = self.reference(tokens).logits
-        devices = ["cpu"] + (["mps"] if torch.backends.mps.is_available() else [])
-        for device in devices:
+        for device in available_devices():
             with self.subTest(device=device):
                 model = import_qwen_weights(self.raw, self.reference.state_dict(), max_seq_len=24).to(device)
                 self.assertIs(model.lm_head.weight, model.embedding.weight)
@@ -38,13 +38,16 @@ class PretrainedTests(unittest.TestCase):
                 torch.testing.assert_close(torch.cat(chunks, dim=1).cpu(), expected, rtol=2e-4, atol=2e-5)
 
     def test_greedy_tokens_match_transformers(self):
-        model = import_qwen_weights(self.raw, self.reference.state_dict(), max_seq_len=24)
         prompt = torch.tensor([[1, 7, 12, 4]])
         with torch.inference_mode():
             expected = self.reference.generate(prompt, attention_mask=torch.ones_like(prompt),
                                                max_new_tokens=5, do_sample=False,
                                                eos_token_id=None, pad_token_id=0)
-        torch.testing.assert_close(generate(model, prompt, 5), expected, rtol=0, atol=0)
+        for device in available_devices():
+            with self.subTest(device=device):
+                model = import_qwen_weights(self.raw, self.reference.state_dict(), max_seq_len=24).to(device)
+                actual = generate(model, prompt.to(device), 5)
+                torch.testing.assert_close(actual.cpu(), expected, rtol=0, atol=0)
 
     def test_untied_output_weights_are_loaded(self):
         self.config.tie_word_embeddings = False
