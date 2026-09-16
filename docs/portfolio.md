@@ -1,12 +1,12 @@
 # LLM Inference Engine
 
-*In progress · Python, PyTorch, Apple MPS · Updated September 15, 2026*
+*In progress · Python, PyTorch, CUDA, Apple MPS · Updated September 15, 2026*
 
 **Project overview**
 
 A small LLM inference engine built to understand how model execution, memory management, and GPU performance fit together. It runs pretrained Qwen2.5-0.5B through a custom decoder and generation loop, with explicit weight loading, a reusable key/value (KV) cache, and numerical checks against Hugging Face Transformers.
 
-Development currently targets CPU and the Apple GPU on a Mac. The longer-term goal is to replace selected PyTorch operations with CUDA C++ and Triton kernels, then study how kernel improvements affect whole-request performance and serving throughput. Those NVIDIA-specific optimizations are future work.
+The runtime is validated on CPU, Apple MPS and an NVIDIA RTX 2080. The next GPU step is to replace selected PyTorch operations with CUDA C++ and Triton kernels and measure their effect on generation. Custom kernels and serving throughput studies remain future work.
 
 **What is implemented**
 
@@ -14,7 +14,7 @@ Development currently targets CPU and the Apple GPU on a Mac. The longer-term go
 - Strict checkpoint loading, including tensor-name/shape checks and tied input/output embeddings. The model revision and dependencies are pinned.
 - Prompt prefill, cached token-by-token decoding, greedy generation, EOS stopping, and explicit context limits.
 - A preallocated contiguous KV cache with capacity checks, model ownership, reset/reuse, and position updates committed after successful forwards.
-- CPU/MPS execution, reference checks, a workload matrix with separate prefill/decode diagnostics, and generation that projects only the final position into vocabulary logits.
+- CPU/MPS/CUDA execution, reference checks, a workload matrix with separate prefill/decode diagnostics, and generation that projects only the final position into vocabulary logits.
 
 The engine owns the forward pass, cache, and generation logic. PyTorch supplies tensor operations and matrix multiplication; Hugging Face supplies pretrained weights, tokenization, and the independent reference model. This project does not train the model or claim new model quality.
 
@@ -74,9 +74,15 @@ At 16 initial tokens, CPU mean decode-step latency improved **4.3%**, with gains
 
 This result changed the implementation decision: fewer tensor operations do not guarantee a faster asynchronous GPU workload. Host waits can include earlier queued work, and synchronized diagnostic totals cannot substitute for normal latency. The MPS device-level cause remains unresolved. Exact KV storage grew linearly at 24 KiB/token and was unchanged by sharing. [Method and interpretation](decode-performance.md) · [All measurements and profiler counts](decode-results.md)
 
+**NVIDIA bring-up**
+
+The same decoder and cache now run on an RTX 2080 with 8 GiB VRAM, using PyTorch 2.6.0/CUDA 12.4 and driver 550.67. The CUDA preflight, 30-test suite, and full-checkpoint comparisons passed. All three reference fixtures matched greedy token IDs; maximum prefill logit error was about 2.34e-5. The Mac dependency configuration is preserved through separate accelerator extras. The initial CUDA request baseline—10 input / 16 output tokens, float32, five runs after two warmups—measured 374.09 ms median cached generation (42.77 output tokens/s), essentially equal to uncached generation on this short workload. [Raw CUDA baseline](../results/rtx2080-generation.json)
+
+The practical obstacle was validation memory: keeping reference and engine weights alive together failed allocations on a host with a 16 GiB process address-space limit. Collecting reference outputs first, then releasing that model before loading the engine, preserved the checks and passed within the existing limits. CUDA execution uses PyTorch library operations; no custom-kernel claim is made. [Setup, raw evidence and reproduction](nvidia.md)
+
 **Correctness before optimization**
 
-Twenty-five offline tests cover operation references, weight mapping, causal masking, cached versus full computation, chunked prefill, cache reuse and overflow, failed-forward handling, generation behavior, optimized-projection parity, shared-RoPE parity, and measurement accounting.
+Thirty offline tests cover operation references, weight mapping, causal masking, cached versus full computation, chunked prefill, cache reuse and overflow, failed-forward handling, generation behavior, optimized-projection parity, shared-RoPE parity, and measurement accounting.
 
 Separate full-checkpoint checks with shared RoPE enabled passed on CPU and MPS for three short prose/code prompts. They compare embedding and layer outputs, prefill logits, and cached decode logits. Cached and uncached greedy generation both exactly matched the reference token sequences on those fixtures. [CPU verification](../results/rope-cpu-verification.json) · [MPS verification](../results/rope-mps-verification.json)
 
@@ -90,7 +96,7 @@ The current implementation favors inspectable computation: it materializes atten
 
 **Next milestones**
 
-Add bounded request scheduling and continuous batching. Investigate the RoPE regression with a Metal device trace when available. Once NVIDIA hardware is available, validate the CUDA baseline, implement selected CUDA/Triton kernels, and connect profiler evidence to end-to-end results.
+Add bounded request scheduling and continuous batching. Investigate the RoPE regression with a Metal device trace when available. Use the RTX 2080 baseline to implement selected CUDA/Triton kernels and connect profiler evidence to end-to-end results.
 
 **Explore the implementation**
 

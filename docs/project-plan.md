@@ -5,10 +5,10 @@ The goal is to connect operator performance to model execution and request-level
 ## Completed
 
 - Qwen2.5-0.5B checkpoint loading into a custom PyTorch decoder, with strict weight-name and shape checks.
-- Float32 CPU/MPS inference, prompt prefill, greedy decoding, EOS handling, and context limits.
+- Float32 CPU/MPS/CUDA inference, prompt prefill, greedy decoding, EOS handling, and context limits.
 - Preallocated contiguous KV storage with ownership, capacity, and reset/reuse checks.
 - Last-token vocabulary projection, preserving the full-logits forward interface.
-- CPU/MPS reference validation, 25 offline tests, and saved performance measurements.
+- CPU/MPS reference validation, 30 offline tests, and saved performance measurements.
 - Separate request/decode timing, component diagnostics, host operator profiles, and context-dependent KV storage accounting.
 - A shared-RoPE experiment retained behind a flag after MPS regressions.
 
@@ -28,7 +28,7 @@ Completion criteria:
 
 ## NVIDIA baseline and custom kernels
 
-First validate the existing float32 implementation on a known NVIDIA GPU. Configure the CUDA PyTorch dependency source, record the hardware/software environment, and establish a new baseline before changing precision or replacing operators. Mac measurements cannot predict CUDA performance.
+The float32 implementation, checkpoint checks and initial request baseline now run on the RTX 2080 using the pinned CUDA 12.4 extra; see the [NVIDIA guide](nvidia.md). Next, profile this baseline before changing precision or replacing operators. Mac measurements cannot predict CUDA performance.
 
 Candidate work:
 
@@ -37,7 +37,7 @@ Candidate work:
 3. Integrate one operation at a time, keeping reference implementations selectable.
 4. Measure isolated device work and whole-request effects separately.
 
-Use device timelines to investigate dispatch and synchronization; use kernel counters where available to support claims about bandwidth or occupancy. These measurements and kernels are planned, not implemented.
+Use device timelines to investigate dispatch and synchronization; use kernel counters where available to support claims about bandwidth or occupancy. Device/kernel counter studies and custom kernels are planned, not implemented.
 
 ## Further investigations
 

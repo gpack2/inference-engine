@@ -9,7 +9,7 @@ uv sync --python 3.12
 uv run tiny-infer --model qwen --device mps --prompt "The capital of France is" --max-new-tokens 16
 ```
 
-The first run caches approximately 1 GB of checkpoint data outside Git. Later runs can add `--offline`. The source weights are converted to float32 for the current engine. CPU is also supported with `--device cpu`. The model is a base completion model: use plain text prompts; no chat template or instruction-tuned behavior is assumed.
+The first run caches approximately 1 GB of checkpoint data outside Git. Later runs can add `--offline`. The source weights are converted to float32 for the current engine. CPU is also supported with `--device cpu`. CUDA is validated on the RTX 2080; use the `cuda124` environment extra and `--device cuda` as described in the [NVIDIA guide](nvidia.md). The model is a base completion model: use plain text prompts; no chat template or instruction-tuned behavior is assumed.
 
 The default engine context cap is 512 tokens. `--context-length` can change it within the checkpoint's declared context limit, but large contexts have not been validated here and the reference attention implementation materializes quadratic score matrices. Generation requires prompt length plus requested output length to fit the configured cap. The tiny model remains available with `--model tiny` and requires no downloaded checkpoint.
 
@@ -21,7 +21,7 @@ The mapping includes Q/K/V biases, both normalization weights per layer, all att
 
 **Validation**
 
-The 25 fast tests include tiny random Hugging Face configurations and do not download any models:
+The 30 fast tests include tiny random Hugging Face configurations and do not download any models:
 
 ```bash
 uv run python -m unittest discover -s tests -v
