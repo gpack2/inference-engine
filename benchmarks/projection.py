@@ -20,7 +20,7 @@ import torch
 from inference_engine import generate
 from inference_engine.device import resolve_device, synchronize
 from inference_engine.pretrained import load_qwen
-from metadata import source_metadata
+from metadata import source_metadata, runtime_metadata
 
 PROMPT_TEXT = (
     "A GPU executes many threads in parallel. Threads read data from memory, "
@@ -172,7 +172,7 @@ def main():
         "complete": False, "device": str(device), "hardware": chip, "platform": platform.platform(),
         "torch": torch.__version__, "python": platform.python_version(), "dtype": "float32", "cpu_threads": 1,
         "model_id": checkpoint.model_id, "model_revision": checkpoint.revision,
-        "model_config": asdict(checkpoint.model.config), **source_metadata(),
+        "model_config": asdict(checkpoint.model.config), **source_metadata(), "runtime": runtime_metadata(device),
         "prompt_construction": {"text": PROMPT_TEXT, "method": "Repeat tokenized phrase, truncate to exact requested length; single fixed prompt per shape"},
         "settings": {"warmup_per_variant": args.warmup, "reuse_rope": False, "repeats": args.repeats,
                      "diagnostic_repeats": args.diagnostic_repeats,

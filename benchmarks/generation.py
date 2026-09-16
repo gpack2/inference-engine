@@ -13,7 +13,7 @@ import torch
 
 from inference_engine import ModelConfig, TinyDecoder, generate
 from inference_engine.device import resolve_device, synchronize
-from metadata import source_metadata
+from metadata import source_metadata, runtime_metadata
 
 
 def main():
@@ -85,7 +85,7 @@ def main():
         "prompt_text": args.prompt,
         "device": str(device), "platform": platform.platform(), "torch": torch.__version__,
         "python": platform.python_version(), "dtype": "float32", "seed": 0, "cpu_threads": 1,
-        **source_metadata(),
+        **source_metadata(), "runtime": runtime_metadata(device),
         "config": asdict(cfg), "prompt_ids": prompt.cpu()[0].tolist(),
         "new_tokens": args.new_tokens, "warmup_runs_per_mode": args.warmup,
         "repeats": args.repeats, "cached_uncached_token_agreement": True,

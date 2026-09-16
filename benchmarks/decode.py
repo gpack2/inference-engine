@@ -13,7 +13,6 @@ import json
 from pathlib import Path
 import platform
 import statistics
-import subprocess
 import time
 from unittest.mock import patch
 
@@ -25,7 +24,7 @@ from inference_engine import generate
 from inference_engine.device import resolve_device, synchronize
 from inference_engine.ops import RMSNorm
 from inference_engine.pretrained import load_qwen
-from metadata import source_metadata
+from metadata import source_metadata, runtime_metadata
 from projection import PROMPT_TEXT, summary
 
 
@@ -223,16 +222,14 @@ def main():
     torch.set_num_threads(1)
     checkpoint = load_qwen(device=device, local_files_only=args.offline)
     phrase = checkpoint.tokenizer.encode(PROMPT_TEXT, add_special_tokens=False)
-    chip = (subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
-                           capture_output=True, text=True).stdout.strip()
-            if platform.system() == "Darwin" else platform.processor())
+    chip = runtime_metadata(device)["hardware"]
     report = {"kind": "cached_decode_profile_and_rope_ablation", "complete": False,
               "timestamp_utc": datetime.now(timezone.utc).isoformat(),
               "device": str(device), "hardware": chip, "platform": platform.platform(),
               "torch": torch.__version__, "python": platform.python_version(),
               "dtype": "float32", "cpu_threads": 1,
               "model_id": checkpoint.model_id, "model_revision": checkpoint.revision,
-              "model_config": asdict(checkpoint.model.config), **source_metadata(),
+              "model_config": asdict(checkpoint.model.config), **source_metadata(), "runtime": runtime_metadata(device),
               "settings": {k: v for k, v in vars(args).items() if k != "output"},
               "prompt_construction": {"text": PROMPT_TEXT, "method": "Repeat encoded phrase then truncate; one prompt per shape"},
               "measurement_scope": {
