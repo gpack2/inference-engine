@@ -1,0 +1,7 @@
+Model=qwen | device=cuda | cache=True | last-token logits=True
+Shared RoPE frequencies: False
+Parameters: 494,032,768
+Prompt: 'The capital of France is'
+Generated token IDs: [12095, 13, 1084, 374, 279, 7772, 3283, 304, 4505, 323, 279, 2086, 7772, 304, 279, 1879]
+Checkpoint: Qwen/Qwen2.5-0.5B@060db6499f32faf8b98477b0a26969ef7d8b9987
+Completion:  Paris. It is the largest city in Europe and the second largest in the world

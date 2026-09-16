@@ -1,0 +1,71 @@
+{
+  "kind": "cuda_preflight",
+  "timestamp_utc": "2026-09-16T00:21:05.637338+00:00",
+  "torch": "2.6.0+cu124",
+  "python": "3.12.3",
+  "platform": "Linux-6.8.0-139-generic-x86_64-with-glibc2.39",
+  "commit": "e0bbdd6362f2dcf297087715963f5f338ef891e0",
+  "working_tree_dirty": true,
+  "source_sha256": {
+    "benchmarks/check_cuda.py": "7239927e1aa9c595c68f4c794b1272d24a18e834013456f1a62e92158104d17a",
+    "benchmarks/decode.py": "5f316ecc067c6b058eea8a035045e733f5d72697d7d27457c9631e616463f67f",
+    "benchmarks/generation.py": "2f8e2978c012f9e4ae108e11b6e6be3a80ccf0c582fe6d81921889caca0fe34b",
+    "benchmarks/metadata.py": "0f289f8a050bee922acc6d0d274b5b1113902a8f02234259d22617e3ce766136",
+    "benchmarks/projection.py": "7e11488ef1d68abf5a6fcd95fe58b8e7627583763e9c7985fa1f0ebeb3edb7eb",
+    "benchmarks/verify_pretrained.py": "c760fc3630ca4ae72f444538268205a190967e91a039b41457d8946bf7154baf",
+    "pyproject.toml": "5fecd6000e8b0064d89a327e17fdab18e2934ac7fc5b59a530030fac28d7b810",
+    "src/inference_engine/__init__.py": "c56a94e6a0ddda6c70b5c4694500bdd112270ef53fc53a78f56869660c2da3ff",
+    "src/inference_engine/cache.py": "a13ac247a348e222b982b71fa48bec1a9a899a12a7c248be4e504a3362ff1f1a",
+    "src/inference_engine/cli.py": "bfb9d96844291e8994063fdd39c8694b367c7a5ea20bfcd60d33dc35a2dee9f8",
+    "src/inference_engine/device.py": "039b3b825575d8b7708386820a8bd196b45e90190a97cb95db3c6979ac587df8",
+    "src/inference_engine/generation.py": "a6a8477e496c85896c73eee3e97c779026df671d8ac26abd154eaa5ad4235caa",
+    "src/inference_engine/model.py": "b639b9ea8b14490d123774093eb802416ac34d98e20cf06a8c8bbdd0aa3ef53d",
+    "src/inference_engine/ops.py": "313ab5e5f095d1d6f8f99b0c03643a6ad8299a81464e1a800c393a25ecab5210",
+    "src/inference_engine/pretrained.py": "5a4034b1000f762803d5e9a0b073179cf2ceeef48e3aca0cdf3b87376d5bdf51",
+    "uv.lock": "8a8aa75459ef9ee7c2e3180d877340a4a9643bd664c1981865144eb4f27c2aaa"
+  },
+  "scope": "Tiny random-weight engine numerical checks on one CUDA device versus CPU. Not a pretrained-model or performance validation.",
+  "passed": true,
+  "runtime": {
+    "device": "cuda",
+    "cuda_runtime": "12.4",
+    "float32_matmul_precision": "highest",
+    "address_space_limit_bytes": {
+      "soft": 17179869184,
+      "hard": 17179869184
+    },
+    "hardware": "NVIDIA GeForce RTX 2080",
+    "device_index": 0,
+    "compute_capability": [
+      7,
+      5
+    ],
+    "total_memory_bytes": 8345812992,
+    "compiled_architectures": [
+      "sm_50",
+      "sm_60",
+      "sm_70",
+      "sm_75",
+      "sm_80",
+      "sm_86",
+      "sm_90"
+    ],
+    "matmul_allow_tf32": false,
+    "driver_version": "550.67"
+  },
+  "max_cpu_cuda_logit_error": 5.960464477539063e-08,
+  "cached_uncached_cpu_token_agreement": true,
+  "chunked_prefill_agreement": true,
+  "generated_ids": [
+    10,
+    15,
+    0,
+    11,
+    29,
+    19,
+    9,
+    18
+  ],
+  "rtol": 0.0002,
+  "atol": 2e-05
+}

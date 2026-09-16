@@ -1,0 +1,35 @@
+test_available_cuda_is_included_and_selected (test_device.DeviceTests.test_available_cuda_is_included_and_selected) ... ok
+test_cpu_fallback_and_unknown_device (test_device.DeviceTests.test_cpu_fallback_and_unknown_device) ... ok
+test_unavailable_cuda_distinguishes_build_from_driver_visibility (test_device.DeviceTests.test_unavailable_cuda_distinguishes_build_from_driver_visibility) ... ok
+test_batched_requests_match_individual_requests (test_engine.EngineTests.test_batched_requests_match_individual_requests) ... ok
+test_cache_capacity_reset_and_storage_reuse (test_engine.EngineTests.test_cache_capacity_reset_and_storage_reuse) ... ok
+test_cached_logits_match_full_prefix_for_chunks_and_single_tokens (test_engine.EngineTests.test_cached_logits_match_full_prefix_for_chunks_and_single_tokens) ... ok
+test_context_boundary_and_invalid_generation (test_engine.EngineTests.test_context_boundary_and_invalid_generation) ... ok
+test_failed_forward_does_not_commit_cache_position (test_engine.EngineTests.test_failed_forward_does_not_commit_cache_position) ... ok
+test_generation_cache_parity_and_eos (test_engine.EngineTests.test_generation_cache_parity_and_eos) ... ok
+test_invalid_config (test_engine.EngineTests.test_invalid_config) ... ok
+test_invalid_tokens_and_cache_ownership (test_engine.EngineTests.test_invalid_tokens_and_cache_ownership) ... ok
+test_last_token_projection_preserves_logits_and_complete_cache (test_engine.EngineTests.test_last_token_projection_preserves_logits_and_complete_cache) ... ok
+test_no_future_token_leakage (test_engine.EngineTests.test_no_future_token_leakage) ... ok
+test_projection_modes_match_generation_with_and_without_cache (test_engine.EngineTests.test_projection_modes_match_generation_with_and_without_cache) ... ok
+test_rope_setup_is_shared_across_q_k_and_layers (test_engine.EngineTests.test_rope_setup_is_shared_across_q_k_and_layers) ... ok
+test_shared_rope_matches_recomputation_across_chunks_cache_reset_and_devices (test_engine.EngineTests.test_shared_rope_matches_recomputation_across_chunks_cache_reset_and_devices) ... ok
+test_gqa_against_independent_per_head_sdpa (test_engine.OperationTests.test_gqa_against_independent_per_head_sdpa) ... ok
+test_rmsnorm_against_pytorch (test_engine.OperationTests.test_rmsnorm_against_pytorch) ... ok
+test_rope_zero_position_norm_and_absolute_offset (test_engine.OperationTests.test_rope_zero_position_norm_and_absolute_offset) ... ok
+test_decode_ablation_preserves_parity_and_paired_sample_accounting (test_measurements.MeasurementTests.test_decode_ablation_preserves_parity_and_paired_sample_accounting) ... ok
+test_decode_profile_preserves_tokens_and_accounts_for_cache (test_measurements.MeasurementTests.test_decode_profile_preserves_tokens_and_accounts_for_cache) ... ok
+test_diagnostic_outputs_phase_counts_and_tensor_bytes (test_measurements.MeasurementTests.test_diagnostic_outputs_phase_counts_and_tensor_bytes) ... ok
+test_paired_trials_keep_raw_samples_and_alternate_order (test_measurements.MeasurementTests.test_paired_trials_keep_raw_samples_and_alternate_order) ... ok
+test_greedy_tokens_match_transformers (test_pretrained.PretrainedTests.test_greedy_tokens_match_transformers) ... ok
+test_mapped_logits_and_cached_chunks_match_transformers (test_pretrained.PretrainedTests.test_mapped_logits_and_cached_chunks_match_transformers) ... ok
+test_missing_extra_wrong_shape_and_inconsistent_ties_rejected (test_pretrained.PretrainedTests.test_missing_extra_wrong_shape_and_inconsistent_ties_rejected) ... ok
+test_unsupported_config_rejected (test_pretrained.PretrainedTests.test_unsupported_config_rejected) ... ok
+test_untied_output_weights_are_loaded (test_pretrained.PretrainedTests.test_untied_output_weights_are_loaded) ... ok
+test_corrupted_reference_is_rejected (test_verification.VerificationTests.test_corrupted_reference_is_rejected) ... ok
+test_fixture_stays_on_cpu_and_retains_all_decode_comparisons (test_verification.VerificationTests.test_fixture_stays_on_cpu_and_retains_all_decode_comparisons) ... ok
+
+----------------------------------------------------------------------
+Ran 30 tests in 1.262s
+
+OK
