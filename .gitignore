@@ -4,3 +4,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# Keep detailed notes and portfolio assets local.
+/docs/*
+!/docs/architecture.md

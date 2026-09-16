@@ -17,10 +17,10 @@ The earlier `qwen-*-verification.json`, `projection-*-verification.json`, and `m
 
 ## Reading the evidence
 
-- [Projection methodology and reproduction](../docs/performance-measurement.md) · [All projection results](../docs/projection-results.md)
-- [Decode methodology and reproduction](../docs/decode-performance.md) · [All decode results](../docs/decode-results.md)
-- [Numerical validation and tolerances](../docs/pretrained.md)
+- [Projection benchmark](../benchmarks/projection.py)
+- [Decode benchmark](../benchmarks/decode.py)
+- [Checkpoint reference checks](../benchmarks/verify_pretrained.py)
 
 Primary comparisons alternate execution order and retain individual samples. Synchronized component diagnostics perturb execution and are not a decomposition of ordinary latency. CPU profiler events on MPS describe host dispatch and waits, not Metal kernel time. Tensor-byte calculations are not peak-memory measurements.
 
-Source hashes identify the files used for each experiment, including runs made before a commit. Historical reports are immutable evidence; later documentation or default-setting changes can make those hashes differ from the current checkout. The RTX 2080 file establishes only its recorded single-request CUDA baseline. No results here establish serving throughput or tail latency. See the [NVIDIA guide](../docs/nvidia.md) for environment differences from the Mac studies.
+Source hashes identify the files used for each experiment, including runs made before a commit. Historical reports are immutable evidence; later documentation or default-setting changes can make those hashes differ from the current checkout. The RTX 2080 file establishes only its recorded single-request CUDA baseline. No results here establish serving throughput or tail latency. Mac and NVIDIA runs use different hardware and PyTorch versions; their timings do not isolate a hardware speedup.

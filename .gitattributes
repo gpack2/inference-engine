@@ -1,3 +1,2 @@
-# Keep generated evidence available without overwhelming source-code reviews.
-docs/assets/*.svg linguist-generated=true -whitespace
+# Keep raw benchmark data out of default source-code reviews.
 results/*.json linguist-generated=true

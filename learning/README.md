@@ -49,10 +49,10 @@ Read the [PyTorch tensor tutorial](https://docs.pytorch.org/tutorials/beginner/b
 4. Why must the first token's output equal its value vector in this exercise?
 5. What computation and data could be reused when one new token arrives?
 
-**Mac now, NVIDIA later**
+**Running the engine**
 
-The tiny decoder, KV cache, and generation loop are now implemented in `src/inference_engine/`. Follow the [engine walkthrough](../docs/engine-walkthrough.md) after the attention example, and run `uv run python -m unittest discover -s tests -v` to check cached versus uncached computation on available devices. Pretrained checkpoint loading and parity checks are also implemented; see the [pretrained guide](../docs/pretrained.md). Request scheduling follows. Keep device and dtype choices at entry points, and allocate masks and caches from the input or model device. CPU remains the correctness oracle. PyTorch's [MPS backend](https://docs.pytorch.org/docs/stable/notes/mps.html) executes supported operations through Apple's Metal framework.
+The decoder, KV cache, and generation loop are implemented in `src/inference_engine/`. Read the [architecture](../docs/architecture.md) after the attention example. Follow the [README](../README.md) to run inference and tests on CPU, MPS, or CUDA. The [checkpoint verifier](../benchmarks/verify_pretrained.py) compares outputs with Transformers. Keep device and dtype choices at entry points, and allocate masks and caches from the input or model device.
 
-When NVIDIA access is ready, install a compatible CUDA-enabled PyTorch environment, run the same correctness checks with `--device cuda`, and establish a new GPU baseline. Add CUDA/Triton kernels behind the same operation interfaces. Backend-specific timing and profiling will be separate: Mac results do not predict NVIDIA speedups. Custom Metal kernels are outside the current scope.
+The NVIDIA baseline runs on an RTX 2080. Custom CUDA/Triton kernels are planned behind the same operation interfaces. Measure each backend separately: Mac results do not predict NVIDIA speedups.
 
 For the KV-cache exercise, distinguish absolute query position from its local tensor row. A decode query of length one may attend to the whole cached prefix. Do not blindly apply a square-prefill causal mask to a rectangular decode input.
